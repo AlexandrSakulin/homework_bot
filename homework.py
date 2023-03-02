@@ -74,7 +74,7 @@ def get_api_answer(timestamp):
             message = (f'Ошибка при получении ответа с сервера '
                        f'{response.status_code}: {response.reason}, '
                        f'{response.text}')
-            raise EndpointStatusError(message)
+            raise ConnectionError(message)
         logger.debug('Получен ответ от сервера')
         return response.json()
     except Exception as error:
