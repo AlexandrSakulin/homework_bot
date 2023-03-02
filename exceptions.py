@@ -8,3 +8,7 @@ class EndpointStatusError(Exception):
 
 class EndpointNotAnswer(Exception):
     """Удаленный сервер не отвечает"""
+
+
+class EmptyAnswersAPI(Exception):
+    """Пустой ответ API."""
