@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 import time
 from http import HTTPStatus
 
@@ -7,7 +8,7 @@ import requests
 import telegram
 from dotenv import load_dotenv
 
-import exceptions
+import exceptions as custom
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -26,6 +27,8 @@ HOMEWORK_VERDICTS = {
     'reviewing': 'Работа взята на проверку ревьюером.',
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
 }
+
+BASE_DIR = os.path.dirname('')
 
 
 def check_tokens():
@@ -74,7 +77,7 @@ def get_api_answer(timestamp):
             message = (f'Ошибка при получении ответа с сервера '
                        f'{response.status_code}: {response.reason}, '
                        f'{response.text}')
-            raise ConnectionError(message)
+            raise custom.InvalidResponseCode(message)
         logger.debug('Получен ответ от сервера')
         return response.json()
     except Exception as error:
@@ -90,7 +93,7 @@ def check_response(response):
     if not isinstance(response, dict):
         raise TypeError('Необрабатываемый ответ API.')
     if 'homeworks' not in response:
-        raise exceptions.EmptyAnswersAPI('Пустой ответ от API')
+        raise custom.EmptyAnswersAPI('Пустой ответ от API')
     homeworks = response.get('homeworks')
     if not isinstance(homeworks, list):
         raise TypeError('Неверные данные.')
@@ -124,15 +127,20 @@ def main():
     while True:
         try:
             response = get_api_answer(timestamp)
-            homework = check_response(response)
-            if homework:
-                message = parse_status(homework[0])
+            homeworks = check_response(response)
+            if homeworks:
+                message = parse_status(homeworks[0])
+                current_report['сообщение'] = message
+            else:
+                message = 'Новых домашек нет'
                 current_report['сообщение'] = message
             if current_report != prev_report:
                 if send_message(bot, message):
                     prev_report = current_report.copy()
                     timestamp = response.get('current_date', timestamp)
-        except exceptions.EmptyAnswersAPI as error:
+            else:
+                logging.DEBUG('Нет обновления статуса')
+        except custom.EmptyAnswersAPI as error:
             logger.debug(f'Пустой ответ от API: {error}')
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
@@ -148,9 +156,12 @@ def main():
 if __name__ == '__main__':
     logging.basicConfig(
         level=logging.DEBUG,
-        filename='logs.log',
-        format='%(asctime)s, %(levelname)s, %(message)s,'
-               '%(funcName)s, %(lineno)s',
-        filemode='a',
+        format='%(asctime)s, %(levelname)s, %(pathname)s,'
+        '%(lineno)d, %(message)s,',
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+            logging.FileHandler(filename=BASE_DIR + 'program.log',
+                                encoding='UTF-8'),
+        ],
     )
     main()
